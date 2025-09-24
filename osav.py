@@ -42,7 +42,7 @@ class OSAV:
         # Update Virus Database link (top-left, blue text)
         self.update_link = ttk.Label(
             self.top_frame,
-            text="update virus database",
+            text="Update Virus Database",
             font=('Arial', 8),
             foreground='#1E90FF',
             cursor="hand2"
@@ -53,7 +53,7 @@ class OSAV:
         # Donate link (top-right, blue text)
         self.donate_link = ttk.Label(
             self.top_frame,
-            text="donate",
+            text="Donate",
             font=('Arial', 8),
             foreground='#1E90FF',
             cursor="hand2"
@@ -165,7 +165,7 @@ class OSAV:
             try:
                 tar_io = io.BytesIO(gz_data)
                 with tarfile.open(fileobj=tar_io) as tar:
-                    tar.extractall(path=tmp_dir)
+                    tar.extractall(path=tmp_dir, filter='data')  # Use 'data' filter to suppress DeprecationWarning and ensure safe extraction
             except tarfile.TarError as e:
                 raise ValueError(f"Failed to extract tar: {e}")
 
