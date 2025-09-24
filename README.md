@@ -23,25 +23,25 @@ Tkinter (included with standard Python installation).
 
 Install dependencies:
 
-  pip install requests
+    pip install requests
 
 Installation
 
 Clone the repository:
 
-  git clone https://github.com/sourcecode347/OSAV-Open_Source_AntiVirus.git
-  cd OSAV
+    git clone https://github.com/sourcecode347/OSAV-Open_Source_AntiVirus.git
+    cd OSAV-Open_Source_AntiVirus
 
 
 Ensure Python 3.8+ is installed.
 Install required packages (if any):
 
-  pip install -r requirements.txt
+    pip install -r requirements.txt
 
 (Create a requirements.txt with requests if needed.)
 Run the application:
   
-  python osav.py
+    python osav.py
 
 
 
