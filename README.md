@@ -11,9 +11,7 @@ Progress Tracking: Displays a progress bar and the currently scanned file path d
 Threat Management: Allows deletion of detected suspicious files.
 External Links: Includes links to update virus definitions and support the project via donations.
 
-<center> 
-<img src="https://github.com/sourcecode347/OSAV-Open_Source_AntiVirus/blob/main/screenshot.png" style="width:60%;height:auto;"/>
-</center>
+<img src="https://github.com/sourcecode347/OSAV-Open_Source_AntiVirus/blob/main/screenshot.png" style="width:50%;height:auto;margin-left:25%;"/>
 
 Requirements
 
