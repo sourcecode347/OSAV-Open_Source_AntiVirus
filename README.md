@@ -1,8 +1,6 @@
 # OSAV - Open Source AntiVirus
 
 OSAV (Open Source AntiVirus) is a lightweight, proof-of-concept antivirus application built in Python. It scans files for known virus signatures using MD5 hashes from ClamAV virus definition files (.cvd) or plain text (.txt) files. It features a dark-themed GUI, multi-threaded scanning, and basic file deletion capabilities for detected threats.
-Note: This is an educational project and not a production-ready antivirus. For real-world protection, use professional tools like Windows Defender or ClamAV.
-Features
 
 Virus Database Import: Supports ClamAV .cvd files (e.g., main.cvd, daily.cvd) and .txt files containing MD5 hashes.
 Multi-threaded Scanning: Efficiently scans folders using multiple CPU cores while keeping one core free to maintain GUI responsiveness.
