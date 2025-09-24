@@ -32,8 +32,7 @@ Includes links to update virus definitions and support the project via donations
 
 Python: Version 3.8 or higher.
 Operating System: Tested on Windows 11 (should work on other platforms with Python support).
-Dependencies:
-requests (not used in this version but may be needed for future updates).
+Dependencies: requests (not used in this version but may be needed for future updates).
 Tkinter (included with standard Python installation).
 
 
@@ -55,7 +54,6 @@ Install required packages (if any):
 
     pip install -r requirements.txt
 
-(Create a requirements.txt with requests if needed.)
 Run the application:
   
     python osav.py
