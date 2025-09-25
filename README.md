@@ -128,7 +128,7 @@ Integrate direct downloads from ClamAV's database.
 
 ## License
 
-This project is licensed under the GNU 3.0 License. See the LICENSE file for details.
+This project is licensed under the GPL 3.0 License. See the LICENSE file for details.
 
 ## Acknowledgments
 
