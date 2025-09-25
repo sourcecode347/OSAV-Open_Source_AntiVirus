@@ -356,6 +356,13 @@ class OSAV:
                 try:
                     file_size = os.path.getsize(file_path)
                     size_str = f"Size: {file_size:,} bytes"
+                    # Skip empty files (0 bytes) to avoid false positives
+                    if file_size == 0:
+                        logging.debug(f"Skipped empty file: {file_path}")
+                        with lock:
+                            processed += 1
+                            self.root.after(0, lambda: self.progress.config(value=processed / total_files * 100))
+                        return
                 except:
                     size_str = "Size: Unknown"
                 self.root.after(0, lambda p=file_path, s=size_str: (self.current_label.config(text=f"Scanning: {p}"), self.size_label.config(text=s)))
