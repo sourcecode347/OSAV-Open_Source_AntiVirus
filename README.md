@@ -31,8 +31,11 @@ Includes links to update virus definitions and support the project via donations
 ## Requirements
 
 Python: Version 3.8 or higher.
+
 Operating System: Tested on Windows 11 (should work on other platforms with Python support).
+
 Dependencies: requests (not used in this version but may be needed for future updates).
+
 Tkinter (included with standard Python installation).
 
 
