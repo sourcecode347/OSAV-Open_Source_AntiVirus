@@ -10,6 +10,10 @@ import threading
 import concurrent.futures
 import queue
 import webbrowser
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class OSAV:
     def __init__(self, root):
@@ -96,7 +100,10 @@ class OSAV:
         """Load hashes from local file."""
         if os.path.exists(self.db_file):
             with open(self.db_file, 'r') as f:
-                self.virus_hashes = set(line.strip() for line in f if line.strip())
+                self.virus_hashes = set(line.strip().lower() for line in f if line.strip() and len(line.strip()) == 32)
+            logging.debug(f"Loaded {len(self.virus_hashes)} hashes from {self.db_file}")
+            if len(self.virus_hashes) == 0:
+                logging.warning(f"No valid MD5 hashes found in {self.db_file}")
         self.save_db()  # Ensure saved without duplicates
 
     def save_db(self):
@@ -104,6 +111,7 @@ class OSAV:
         with open(self.db_file, 'w') as f:
             for h in sorted(self.virus_hashes):
                 f.write(h + '\n')
+        logging.debug(f"Saved {len(self.virus_hashes)} hashes to {self.db_file}")
 
     def import_db(self):
         """Import hashes from CVD or TXT file."""
@@ -127,6 +135,7 @@ class OSAV:
             messagebox.showinfo("Success", f"Database updated! Now has {len(self.virus_hashes)} hashes.")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to import: {str(e)}")
+            logging.error(f"Import failed: {str(e)}")
         finally:
             self.progress['value'] = 100
             self.root.update_idletasks()
@@ -140,8 +149,11 @@ class OSAV:
                 hash_val = line.strip().lower()
                 if len(hash_val) == 32:  # Assume MD5
                     self.virus_hashes.add(hash_val)
+                else:
+                    logging.warning(f"Invalid hash in {file_path}: {hash_val}")
                 self.progress['value'] = (i + 1) / total * 100
                 self.root.update_idletasks()
+        logging.debug(f"Imported {len(self.virus_hashes)} hashes from {file_path}")
 
     def import_cvd(self, file_path):
         """Import hashes from CVD file by skipping header, decompressing, and parsing signature files."""
@@ -165,7 +177,7 @@ class OSAV:
             try:
                 tar_io = io.BytesIO(gz_data)
                 with tarfile.open(fileobj=tar_io) as tar:
-                    tar.extractall(path=tmp_dir, filter='data')  # Use 'data' filter to suppress DeprecationWarning and ensure safe extraction
+                    tar.extractall(path=tmp_dir, filter='data')  # Use 'data' filter for safe extraction
             except tarfile.TarError as e:
                 raise ValueError(f"Failed to extract tar: {e}")
 
@@ -190,10 +202,12 @@ class OSAV:
                             if hash_val not in self.virus_hashes:
                                 self.virus_hashes.add(hash_val)
                                 added_count += 1
+                        else:
+                            logging.warning(f"Invalid hash in {hf_path}: {hash_val}")
                 self.progress['value'] = (i + 1) / total_files * 100
                 self.root.update_idletasks()
 
-            print(f"Added {added_count} new hashes from {total_files} files.")  # For debugging
+            logging.debug(f"Added {added_count} new hashes from {total_files} files in {file_path}")
 
     def compute_hash(self, file_path):
         """Compute MD5 hash of a file (to match ClamAV hashes)."""
@@ -202,8 +216,11 @@ class OSAV:
             with open(file_path, 'rb') as f:
                 while chunk := f.read(4096):
                     md5_hash.update(chunk)
-            return md5_hash.hexdigest().lower()
-        except Exception:
+            hash_val = md5_hash.hexdigest().lower()
+            logging.debug(f"Computed hash for {file_path}: {hash_val}")
+            return hash_val
+        except Exception as e:
+            logging.error(f"Failed to compute hash for {file_path}: {str(e)}")
             return None
 
     def start_scan(self):
@@ -237,6 +254,7 @@ class OSAV:
                 self.root.after(0, lambda: messagebox.showinfo("Results", "No files found!"))
                 return
 
+            logging.debug(f"Scanning {total_files} files in {folder}")
             detected = []
             processed = 0
             lock = threading.Lock()
@@ -245,8 +263,11 @@ class OSAV:
                 nonlocal processed
                 self.root.after(0, lambda p=file_path: self.current_label.config(text=f"Scanning: {p}"))
                 file_hash = self.compute_hash(file_path)
-                if file_hash and file_hash in self.virus_hashes:
-                    self.detected_queue.put((file_path, file_hash))
+                if file_hash:
+                    logging.debug(f"Checking {file_path} with hash {file_hash}")
+                    if file_hash in self.virus_hashes:
+                        logging.info(f"Detected virus in {file_path}: {file_hash}")
+                        self.detected_queue.put((file_path, file_hash))
                 with lock:
                     processed += 1
                     self.root.after(0, lambda: self.progress.config(value=processed / total_files * 100))
@@ -268,6 +289,7 @@ class OSAV:
                 self.root.after(0, lambda: messagebox.showinfo("Results", "No viruses found!"))
 
             self.root.after(0, lambda: self.current_label.config(text=""))
+            logging.debug(f"Scan completed: {len(detected)} viruses found")
         finally:
             self.scanning = False
 
@@ -289,8 +311,10 @@ class OSAV:
             try:
                 os.remove(file_path)
                 self.results_list.delete(idx)
+                logging.info(f"Deleted file: {file_path}")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to delete {file_path}: {str(e)}")
+                logging.error(f"Failed to delete {file_path}: {str(e)}")
 
 if __name__ == "__main__":
     root = tk.Tk()
