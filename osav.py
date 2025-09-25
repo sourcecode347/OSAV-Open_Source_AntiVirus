@@ -12,7 +12,7 @@ import queue
 import webbrowser
 import logging
 
-# Set up logging
+# Set up logging with reduced verbosity for invalid hashes
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class OSAV:
@@ -69,8 +69,12 @@ class OSAV:
         self.label = ttk.Label(self.frame, text="Welcome to OSAV", font=('Arial', 14))
         self.label.pack(pady=10)
 
+        # Database count label for debugging
+        self.db_count_label = ttk.Label(self.frame, text=f"Loaded hashes: {len(self.virus_hashes)}", font=('Arial', 10))
+        self.db_count_label.pack(pady=5)
+
         # Button to import database
-        self.import_btn = ttk.Button(self.frame, text="Import Database File (CVD/TXT)", command=self.import_db)
+        self.import_btn = ttk.Button(self.frame, text="Import Database File (CVD/TXT)", command=self.start_import_db)
         self.import_btn.pack(pady=5)
 
         # Button to scan folder
@@ -94,13 +98,18 @@ class OSAV:
         self.delete_btn.pack(pady=5)
 
         self.scanning = False
+        self.importing = False
         self.detected_queue = queue.Queue()
 
     def load_db(self):
-        """Load hashes from local file."""
+        """Load hashes from local file, ensuring lowercase and valid MD5 length."""
         if os.path.exists(self.db_file):
             with open(self.db_file, 'r') as f:
-                self.virus_hashes = set(line.strip().lower() for line in f if line.strip() and len(line.strip()) == 32)
+                self.virus_hashes = set(
+                    line.strip().lower() 
+                    for line in f 
+                    if line.strip() and len(line.strip().lower()) == 32 and all(c in '0123456789abcdef' for c in line.strip().lower())
+                )
             logging.debug(f"Loaded {len(self.virus_hashes)} hashes from {self.db_file}")
             if len(self.virus_hashes) == 0:
                 logging.warning(f"No valid MD5 hashes found in {self.db_file}")
@@ -113,15 +122,24 @@ class OSAV:
                 f.write(h + '\n')
         logging.debug(f"Saved {len(self.virus_hashes)} hashes to {self.db_file}")
 
-    def import_db(self):
-        """Import hashes from CVD or TXT file."""
+    def start_import_db(self):
+        """Start importing database in a background thread."""
+        if self.importing:
+            messagebox.showwarning("Warning", "Import already in progress.")
+            return
         file_path = filedialog.askopenfilename(title="Select Database File", filetypes=[("Database Files", "*.cvd *.txt")])
         if not file_path:
             return
 
+        self.importing = True
         self.progress['value'] = 0
+        self.current_label.config(text="Importing database...")
         self.root.update_idletasks()
 
+        threading.Thread(target=self.import_db, args=(file_path,), daemon=True).start()
+
+    def import_db(self, file_path):
+        """Import hashes from CVD or TXT file."""
         try:
             if file_path.lower().endswith('.txt'):
                 self.import_txt(file_path)
@@ -132,27 +150,31 @@ class OSAV:
                 return
 
             self.save_db()
-            messagebox.showinfo("Success", f"Database updated! Now has {len(self.virus_hashes)} hashes.")
+            self.root.after(0, lambda: self.db_count_label.config(text=f"Loaded hashes: {len(self.virus_hashes)}"))
+            self.root.after(0, lambda: messagebox.showinfo("Success", f"Database updated! Now has {len(self.virus_hashes)} hashes."))
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to import: {str(e)}")
+            self.root.after(0, lambda: messagebox.showerror("Error", f"Failed to import: {str(e)}"))
             logging.error(f"Import failed: {str(e)}")
         finally:
-            self.progress['value'] = 100
-            self.root.update_idletasks()
+            self.importing = False
+            self.root.after(0, lambda: self.progress.config(value=100))
+            self.root.after(0, lambda: self.current_label.config(text=""))
 
     def import_txt(self, file_path):
         """Import hashes from TXT file."""
         with open(file_path, 'r') as f:
             lines = f.readlines()
             total = len(lines)
+            invalid_count = 0
             for i, line in enumerate(lines):
                 hash_val = line.strip().lower()
-                if len(hash_val) == 32:  # Assume MD5
+                if len(hash_val) == 32 and all(c in '0123456789abcdef' for c in hash_val):  # Valid MD5
                     self.virus_hashes.add(hash_val)
                 else:
-                    logging.warning(f"Invalid hash in {file_path}: {hash_val}")
-                self.progress['value'] = (i + 1) / total * 100
-                self.root.update_idletasks()
+                    invalid_count += 1
+                self.root.after(0, lambda val=(i + 1) / total * 100: self.progress.config(value=val))
+            if invalid_count > 0:
+                logging.warning(f"Skipped {invalid_count} invalid hashes in {file_path}")
         logging.debug(f"Imported {len(self.virus_hashes)} hashes from {file_path}")
 
     def import_cvd(self, file_path):
@@ -188,6 +210,7 @@ class OSAV:
                 raise ValueError("No hash database files (.hdb/.mdb) found in CVD.")
 
             added_count = 0
+            invalid_count = 0
             for i, hf in enumerate(hash_files):
                 hf_path = os.path.join(tmp_dir, hf)
                 with open(hf_path, 'r', encoding='latin1', errors='ignore') as f:
@@ -198,15 +221,15 @@ class OSAV:
                             continue
                         parts = line.split(':', 1)
                         hash_val = parts[0].lower()
-                        if len(hash_val) == 32:  # MD5 hash
+                        if len(hash_val) == 32 and all(c in '0123456789abcdef' for c in hash_val):  # Valid MD5
                             if hash_val not in self.virus_hashes:
                                 self.virus_hashes.add(hash_val)
                                 added_count += 1
                         else:
-                            logging.warning(f"Invalid hash in {hf_path}: {hash_val}")
-                self.progress['value'] = (i + 1) / total_files * 100
-                self.root.update_idletasks()
-
+                            invalid_count += 1
+                self.root.after(0, lambda val=(i + 1) / total_files * 100: self.progress.config(value=val))
+            if invalid_count > 0:
+                logging.warning(f"Skipped {invalid_count} invalid hashes in {file_path}")
             logging.debug(f"Added {added_count} new hashes from {total_files} files in {file_path}")
 
     def compute_hash(self, file_path):
@@ -232,6 +255,7 @@ class OSAV:
         if not folder:
             return
 
+        logging.debug(f"Starting scan with {len(self.virus_hashes)} hashes in DB")
         self.scanning = True
         self.results_list.delete(0, tk.END)
         self.progress['value'] = 0
@@ -261,13 +285,11 @@ class OSAV:
 
             def process_file(file_path):
                 nonlocal processed
-                self.root.after(0, lambda p=file_path: self.current_label.config(text=f"Scanning: {p}"))
+                self.root.after(0, lambda p=file_path: self.current_label.config(text=f"Scanning: {os.path.basename(p)}"))
                 file_hash = self.compute_hash(file_path)
-                if file_hash:
-                    logging.debug(f"Checking {file_path} with hash {file_hash}")
-                    if file_hash in self.virus_hashes:
-                        logging.info(f"Detected virus in {file_path}: {file_hash}")
-                        self.detected_queue.put((file_path, file_hash))
+                if file_hash and file_hash in self.virus_hashes:
+                    logging.info(f"Detected virus in {file_path}: {file_hash}")
+                    self.detected_queue.put((file_path, file_hash))
                 with lock:
                     processed += 1
                     self.root.after(0, lambda: self.progress.config(value=processed / total_files * 100))
