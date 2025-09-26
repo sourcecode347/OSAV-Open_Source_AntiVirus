@@ -34,16 +34,14 @@ Python: Version 3.8 or higher.
 
 Operating System: Tested on Windows 11 (should work on other platforms with Python support).
 
-Dependencies: requests (not used in this version but may be needed for future updates).
-
 Tkinter (included with standard Python installation).
 
 
 
-## Install dependencies:
-
-    pip install requests
-
+## Install dependencies on Linux:
+        
+        sudo apt install python3-tk
+    
 ## Installation
 
 Clone the repository:
@@ -53,15 +51,10 @@ Clone the repository:
 
 
 Ensure Python 3.8+ is installed.
-Install required packages (if any):
-
-    pip install -r requirements.txt
 
 Run the application:
   
     python osav.py
-
-
 
 ## Usage
 
