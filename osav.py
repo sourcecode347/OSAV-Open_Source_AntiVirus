@@ -96,6 +96,10 @@ class OSAV:
         self.size_label = ttk.Label(self.frame, text="", font=('Arial', 8))
         self.size_label.pack(pady=2)
 
+        # Add label for scanned files count
+        self.scanned_files_label = ttk.Label(self.frame, text="Files Scanned: 0", font=('Arial', 8))
+        self.scanned_files_label.pack(pady=2)
+
         # Add listbox for scan results (height reduced by 1)
         self.results_list = tk.Listbox(self.frame, bg='#2e2e2e', fg='white', font=('Arial', 10), height=9)
         self.results_list.pack(fill=tk.BOTH, expand=True, pady=10)
@@ -156,6 +160,7 @@ class OSAV:
         self.progress['value'] = 0
         self.current_label.config(text="Importing database...")
         self.size_label.config(text="")
+        self.scanned_files_label.config(text="Files Scanned: 0")
         self.root.update_idletasks()
 
         threading.Thread(target=self.import_db, args=(file_path,), daemon=True).start()
@@ -182,6 +187,7 @@ class OSAV:
             self.root.after(0, lambda: self.progress.config(value=100))
             self.root.after(0, lambda: self.current_label.config(text=""))
             self.root.after(0, lambda: self.size_label.config(text=""))
+            self.root.after(0, lambda: self.scanned_files_label.config(text="Files Scanned: 0"))
 
     def import_txt(self, file_path):
         # Import hashes from TXT file, counting MD5, SHA1, SHA256
@@ -326,6 +332,7 @@ class OSAV:
         self.progress['value'] = 0
         self.current_label.config(text="")
         self.size_label.config(text="")
+        self.scanned_files_label.config(text="Files Scanned: 0")
         self.root.update_idletasks()
 
         threading.Thread(target=self.scan_folder, args=(folder,), daemon=True).start()
@@ -362,6 +369,7 @@ class OSAV:
                         with lock:
                             processed += 1
                             self.root.after(0, lambda: self.progress.config(value=processed / total_files * 100))
+                            self.root.after(0, lambda: self.scanned_files_label.config(text=f"Files Scanned: {processed}"))
                         return
                 except:
                     size_str = "Size: Unknown"
@@ -375,6 +383,7 @@ class OSAV:
                 with lock:
                     processed += 1
                     self.root.after(0, lambda: self.progress.config(value=processed / total_files * 100))
+                    self.root.after(0, lambda: self.scanned_files_label.config(text=f"Files Scanned: {processed}"))
 
             # Use multi-threading for scanning
             max_workers = max(1, os.cpu_count() - 1)
@@ -396,6 +405,7 @@ class OSAV:
 
             self.root.after(0, lambda: self.current_label.config(text=""))
             self.root.after(0, lambda: self.size_label.config(text=""))
+            self.root.after(0, lambda: self.scanned_files_label.config(text=f"Files Scanned: {processed}"))
             end_time = time.time()
             logging.debug(f"Scan completed: {len(detected)} viruses found in {end_time - start_time:.2f} seconds")
         finally:
