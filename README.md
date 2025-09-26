@@ -95,7 +95,7 @@ GUI: Built with Tkinter, featuring a dark theme, progress bar, and real-time fil
 ## Limitations
 
 Proof-of-Concept: Not a full-fledged antivirus; it relies on hash-based detection, which may miss polymorphic or new malware.
-MD5 Only: Currently supports MD5 hashes (as used by ClamAV). Other hash types (e.g., SHA256) are not supported.
+Hash Support: Currently supports MD5 , SHA1 and SHA256 hashes (as used by ClamAV).
 No Real-time Protection: Only manual folder scanning is available.
 Basic Error Handling: May not handle all edge cases (e.g., corrupted .cvd files or permission issues).
 
