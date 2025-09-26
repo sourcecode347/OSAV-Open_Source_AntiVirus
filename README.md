@@ -40,7 +40,7 @@ Tkinter (included with standard Python installation).
 
 ## Install dependencies on Linux:
         
-        sudo apt install python3-tk
+    sudo apt install python3-tk
     
 ## Installation
 
