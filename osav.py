@@ -12,6 +12,7 @@ import queue
 import webbrowser
 import logging
 import time
+import pickle
 
 # Configure logging with timestamp, level, and message format
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,7 +27,7 @@ class OSAV:
 
         # Initialize set for virus hashes and database file
         self.virus_hashes = set()
-        self.db_file = "virus_hashes.txt"
+        self.pkl_file = "virus_hashes.pkl"
         self.load_db()
 
         # Configure dark theme styles
@@ -127,25 +128,26 @@ class OSAV:
         self.use_all_hashes = True  # Toggle to False to compute only MD5 for speed test
 
     def load_db(self):
-        # Load hashes from virus_hashes.txt, accepting MD5 (32), SHA1 (40), or SHA256 (64) chars
-        if os.path.exists(self.db_file):
-            with open(self.db_file, 'r') as f:
-                self.virus_hashes = set(
-                    line.strip().lower() 
-                    for line in f 
-                    if line.strip() and len(line.strip().lower()) in (32, 40, 64) and all(c in '0123456789abcdef' for c in line.strip().lower())
-                )
-            logging.debug(f"Loaded {len(self.virus_hashes)} hashes from {self.db_file}")
-            if len(self.virus_hashes) == 0:
-                logging.warning(f"No valid MD5/SHA1/SHA256 hashes found in {self.db_file}")
-        self.save_db()
+        # Load hashes from virus_hashes.pkl if exists
+        if os.path.exists(self.pkl_file):
+            try:
+                with open(self.pkl_file, 'rb') as f:
+                    self.virus_hashes = pickle.load(f)
+                logging.debug(f"Loaded {len(self.virus_hashes)} hashes from {self.pkl_file}")
+            except Exception as e:
+                logging.error(f"Failed to load {self.pkl_file}: {str(e)}")
+                self.virus_hashes = set()
+        else:
+            logging.debug(f"No {self.pkl_file} found, starting with empty hash set")
 
     def save_db(self):
-        # Save unique hashes to virus_hashes.txt
-        with open(self.db_file, 'w') as f:
-            for h in sorted(self.virus_hashes):
-                f.write(h + '\n')
-        logging.debug(f"Saved {len(self.virus_hashes)} hashes to {self.db_file}")
+        # Save hashes set to virus_hashes.pkl for fast loading
+        try:
+            with open(self.pkl_file, 'wb') as f:
+                pickle.dump(self.virus_hashes, f)
+            logging.debug(f"Saved {len(self.virus_hashes)} hashes to {self.pkl_file}")
+        except Exception as e:
+            logging.error(f"Failed to save {self.pkl_file}: {str(e)}")
 
     def start_import_db(self):
         # Start database import in a background thread
@@ -191,8 +193,9 @@ class OSAV:
 
     def import_txt(self, file_path):
         # Import hashes from TXT file, counting MD5, SHA1, SHA256
-        with open(file_path, 'r') as f:
-            lines = f.readlines()
+        try:
+            with open(file_path, 'r') as f:
+                lines = f.readlines()
             total = len(lines)
             invalid_count = 0
             invalid_samples = []
@@ -215,48 +218,51 @@ class OSAV:
             if invalid_count > 0:
                 logging.warning(f"Skipped {invalid_count} invalid hashes in {file_path}. Sample invalid entries: {invalid_samples[:5]}")
             logging.debug(f"Imported from {file_path}: {md5_count} MD5, {sha1_count} SHA1, {sha256_count} SHA256 hashes")
+        except Exception as e:
+            logging.error(f"Failed to import {file_path}: {str(e)}")
 
     def import_cvd(self, file_path):
         # Import hashes from CVD file, processing .hdb, .hsb, .msb files
-        with open(file_path, 'rb') as f:
-            header = f.read(512)
-            if len(header) < 512:
-                raise ValueError("File too small to be a valid CVD.")
-            header_str = header.decode('utf-8', errors='ignore').strip()
-            if not header_str.startswith('ClamAV-VDB'):
-                raise ValueError("Invalid CVD file header.")
-            data = f.read()
-
-        # Decompress gzip data
         try:
-            gz_data = gzip.decompress(data)
-        except OSError as e:
-            raise ValueError(f"Failed to decompress: {e}")
+            with open(file_path, 'rb') as f:
+                header = f.read(512)
+                if len(header) < 512:
+                    raise ValueError("File too small to be a valid CVD.")
+                header_str = header.decode('utf-8', errors='ignore').strip()
+                if not header_str.startswith('ClamAV-VDB'):
+                    raise ValueError("Invalid CVD file header.")
+                data = f.read()
 
-        # Extract tar to temporary directory
-        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Decompress gzip data
             try:
-                tar_io = io.BytesIO(gz_data)
-                with tarfile.open(fileobj=tar_io) as tar:
-                    tar.extractall(path=tmp_dir, filter='data')
-            except tarfile.TarError as e:
-                raise ValueError(f"Failed to extract tar: {e}")
+                gz_data = gzip.decompress(data)
+            except OSError as e:
+                raise ValueError(f"Failed to decompress: {e}")
 
-            # Find hash database files
-            hash_files = [f for f in os.listdir(tmp_dir) if f.endswith(('.hdb', '.hsb', '.msb'))]
-            total_files = len(hash_files)
-            if total_files == 0:
-                raise ValueError("No hash database files (.hdb, .hsb, .msb) found in CVD.")
+            # Extract tar to temporary directory
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                try:
+                    tar_io = io.BytesIO(gz_data)
+                    with tarfile.open(fileobj=tar_io) as tar:
+                        tar.extractall(path=tmp_dir, filter='data')
+                except tarfile.TarError as e:
+                    raise ValueError(f"Failed to extract tar: {e}")
 
-            # Process each hash file
-            added_count = 0
-            invalid_count = 0
-            invalid_samples = []
-            md5_count = sha1_count = sha256_count = 0
-            for i, hf in enumerate(hash_files):
-                hf_path = os.path.join(tmp_dir, hf)
-                with open(hf_path, 'r', encoding='latin1', errors='ignore') as f:
-                    lines = f.readlines()
+                # Find hash database files
+                hash_files = [f for f in os.listdir(tmp_dir) if f.endswith(('.hdb', '.hsb', '.msb'))]
+                total_files = len(hash_files)
+                if total_files == 0:
+                    raise ValueError("No hash database files (.hdb, .hsb, .msb) found in CVD.")
+
+                # Process each hash file
+                added_count = 0
+                invalid_count = 0
+                invalid_samples = []
+                md5_count = sha1_count = sha256_count = 0
+                for i, hf in enumerate(hash_files):
+                    hf_path = os.path.join(tmp_dir, hf)
+                    with open(hf_path, 'r', encoding='latin1', errors='ignore') as f:
+                        lines = f.readlines()
                     for line in lines:
                         line = line.strip()
                         if not line:
@@ -277,10 +283,12 @@ class OSAV:
                             invalid_count += 1
                             if len(invalid_samples) < 5:
                                 invalid_samples.append(hash_val)
-                self.root.after(0, lambda val=(i + 1) / total_files * 100: self.progress.config(value=val))
-            if invalid_count > 0:
-                logging.warning(f"Skipped {invalid_count} invalid hashes in {file_path}. Sample invalid entries: {invalid_samples[:5]}")
-            logging.debug(f"Imported from {file_path}: {md5_count} MD5, {sha1_count} SHA1, {sha256_count} SHA256 hashes, total added: {added_count}")
+                    self.root.after(0, lambda val=(i + 1) / total_files * 100: self.progress.config(value=val))
+                if invalid_count > 0:
+                    logging.warning(f"Skipped {invalid_count} invalid hashes in {file_path}. Sample invalid entries: {invalid_samples[:5]}")
+                logging.debug(f"Imported from {file_path}: {md5_count} MD5, {sha1_count} SHA1, {sha256_count} SHA256 hashes, total added: {added_count}")
+        except Exception as e:
+            logging.error(f"Failed to import {file_path}: {str(e)}")
 
     def compute_hash(self, file_path):
         # Compute MD5, SHA1, and SHA256 hashes, or only MD5 if use_all_hashes is False
@@ -417,7 +425,7 @@ class OSAV:
             messagebox.showwarning("Warning", "No detections to export.")
             return
 
-        detections_file = os.path.join(os.path.dirname(self.db_file), "detections.txt")
+        detections_file = os.path.join(os.path.dirname(self.pkl_file), "detections.txt")
         try:
             with open(detections_file, 'w', encoding='utf-8') as f:
                 for i in range(self.results_list.size()):
