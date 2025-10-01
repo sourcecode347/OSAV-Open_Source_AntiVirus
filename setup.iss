@@ -35,8 +35,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "{#SourcePath}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: ".\database\*"; DestDir: "{app}\database"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: ".\virus_hashes.pkl"; DestDir: "{app}"; Flags: ignoreversion
+; Following file and folder doesn't exist in the repo so removed 
+;Source: ".\database\*"; DestDir: "{app}\database"; Flags: ignoreversion recursesubdirs createallsubdirs
+;Source: ".\virus_hashes.pkl"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyAppIcon}"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
